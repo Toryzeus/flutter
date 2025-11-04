@@ -119,7 +119,7 @@ class PlatformViewManager {
   /// The resulting DOM for the `contents` of a Platform View looks like this:
   ///
   /// ```html
-  /// <flt-platform-view id="flt-pv-VIEW_ID" slot="...">
+  /// <flt-platform-view id="flt-pv-VIEW_ID" slot="..." inert>
   ///   <arbitrary-html-elements />
   /// </flt-platform-view-slot>
   /// ```
@@ -131,6 +131,9 @@ class PlatformViewManager {
   /// a place where to attach the `slot` property, that will tell the browser
   /// what `slot` tag will reveal this `contents`, **without modifying the returned
   /// html from the `factory` function**.
+  ///
+  /// By default, platform views are made inert. The semantics layer will remove
+  /// this when a semantic node is created.
   DomElement renderContent(String viewType, int viewId, Object? params) {
     assert(
       knowsViewType(viewType),
@@ -157,6 +160,8 @@ class PlatformViewManager {
 
       _ensureContentCorrectlySized(content, viewType);
       wrapper.append(content);
+
+      wrapper.setAttribute('inert', '');
 
       return wrapper;
     });
@@ -208,6 +213,23 @@ class PlatformViewManager {
   /// Returns `true` if the given [viewId] is a platform view with a visible
   /// component.
   bool isVisible(int viewId) => !isInvisible(viewId);
+
+  /// Updates the accessibility attributes of a platform view.
+  ///
+  /// This is called by the semantics layer to hide or show platform views
+  /// from screen readers based on semantic properties like ExcludeSemantics.
+  void updatePlatformViewAccessibility(int viewId, bool isHidden) {
+    final DomElement? wrapper = getSlottedContent(viewId);
+    if (wrapper == null) {
+      return;
+    }
+
+    if (isHidden) {
+      wrapper.setAttribute('inert', '');
+    } else {
+      wrapper.removeAttribute('inert');
+    }
+  }
 
   /// Clears the state. Used in tests.
   void debugClear() {
