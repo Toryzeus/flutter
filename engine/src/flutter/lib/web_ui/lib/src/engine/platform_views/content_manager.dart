@@ -37,6 +37,9 @@ class PlatformViewManager {
   /// rendering of PlatformViews into the web app.
   static PlatformViewManager instance = PlatformViewManager();
 
+  /// The attribute name used to make platform views inert (hidden from accessibility).
+  static const String _inertAttribute = 'inert';
+
   // The factory functions, indexed by the viewType
   final Map<String, Function> _factories = <String, Function>{};
 
@@ -161,7 +164,7 @@ class PlatformViewManager {
       _ensureContentCorrectlySized(content, viewType);
       wrapper.append(content);
 
-      wrapper.setAttribute('inert', '');
+      wrapper.setAttribute(_inertAttribute, '');
 
       return wrapper;
     });
@@ -225,9 +228,9 @@ class PlatformViewManager {
     }
 
     if (isHidden) {
-      wrapper.setAttribute('inert', '');
+      wrapper.setAttribute(_inertAttribute, '');
     } else {
-      wrapper.removeAttribute('inert');
+      wrapper.removeAttribute(_inertAttribute);
     }
   }
 
