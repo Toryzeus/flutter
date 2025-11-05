@@ -115,6 +115,40 @@ typedef SemanticsUpdateCallback = void Function(SemanticsUpdate update);
 typedef ChildSemanticsConfigurationsDelegate =
     ChildSemanticsConfigurationsResult Function(List<SemanticsConfiguration>);
 
+/// Controls how accessibility focus is blocked.
+///
+/// This is typically used to prevent screen readers
+/// from focusing on parts of the UI.
+enum AccessiblityFocusBlockType {
+  /// Accessibility focus is **not blocked**.
+  none,
+
+  /// Blocks accessibility focus for the entire subtree.
+  blockSubtree,
+
+  /// Blocks accessibility focus for the **current node only**. Its descendants
+  /// may still be focusable.
+  blockNode;
+
+  /// The AccessiblityFocusBlockType when two nodes get merged.
+  AccessiblityFocusBlockType _merge(AccessiblityFocusBlockType other) {
+    // 1. If either is blockSubtree, the result is blockSubtree.
+    if (this == AccessiblityFocusBlockType.blockSubtree ||
+        other == AccessiblityFocusBlockType.blockSubtree) {
+      return AccessiblityFocusBlockType.blockSubtree;
+    }
+
+    // 2. If either is blockNode, the result is blockNode
+    if (this == AccessiblityFocusBlockType.blockNode ||
+        other == AccessiblityFocusBlockType.blockNode) {
+      return AccessiblityFocusBlockType.blockNode;
+    }
+
+    // 3. If neither is blockSubtree nor blockNode, both must be none.
+    return AccessiblityFocusBlockType.none;
+  }
+}
+
 final int _kUnblockedUserActions =
     SemanticsAction.didGainAccessibilityFocus.index |
     SemanticsAction.didLoseAccessibilityFocus.index;
@@ -489,6 +523,12 @@ sealed class _DebugSemanticsRoleChecks {
       if (!isExpanded && hasCollapseAction) {
         return FlutterError('A collapsed node cannot have a collapse action.');
       }
+    }
+    if (data.flagsCollection.isAccessibilityFocusBlocked &&
+        data.flagsCollection.isFocused != Tristate.none) {
+      return FlutterError(
+        'A node that is keyboard focusable cannot be set to accessibility unfocusable',
+      );
     }
 
     return null;
@@ -1544,6 +1584,7 @@ class SemanticsProperties extends DiagnosticableTree {
     )
     this.focusable,
     this.focused,
+    this.accessiblityFocusBlockType,
     this.inMutuallyExclusiveGroup,
     this.hidden,
     this.obscured,
@@ -1750,6 +1791,13 @@ class SemanticsProperties extends DiagnosticableTree {
   /// green/black rectangular highlight that TalkBack/VoiceOver draws around the
   /// element it is reading, and is separate from input focus.
   final bool? focused;
+
+  /// If non-null, indicates if this subtree or current node is blocked in a11y focus.
+  ///
+  /// This is for accessibility focus, which is the focus used by screen readers
+  /// like TalkBack and VoiceOver. It is different from input focus, which is
+  /// usually held by the element that currently responds to keyboard inputs.
+  final AccessiblityFocusBlockType? accessiblityFocusBlockType;
 
   /// If non-null, whether a semantic node is in a mutually exclusive group.
   ///
@@ -6137,6 +6185,17 @@ class SemanticsConfiguration {
     _hasBeenAnnotated = true;
   }
 
+  AccessiblityFocusBlockType _accessiblityFocusBlockType = AccessiblityFocusBlockType.none;
+
+  /// Whether the owning [RenderObject] and its subtree
+  /// is blocked in the a11y focus (different from input focus).
+  AccessiblityFocusBlockType get accessiblityFocusBlockType => _accessiblityFocusBlockType;
+  set accessiblityFocusBlockType(AccessiblityFocusBlockType value) {
+    _accessiblityFocusBlockType = value;
+    _flags = _flags.copyWith(isAccessibilityFocusBlocked: value != AccessiblityFocusBlockType.none);
+    _hasBeenAnnotated = true;
+  }
+
   /// Whether the owning [RenderObject] is a button (true) or not (false).
   bool get isButton => _flags.isButton;
   set isButton(bool value) {
@@ -6454,9 +6513,10 @@ class SemanticsConfiguration {
     if (_actionsAsBits & other._actionsAsBits != 0) {
       return false;
     }
-    if (_flags.hasRepeatedFlags(other._flags)) {
+    if (_flags.hasConflictingFlags(other._flags)) {
       return false;
     }
+
     if (_platformViewId != null && other._platformViewId != null) {
       return false;
     }
@@ -6582,6 +6642,9 @@ class SemanticsConfiguration {
         _validationResult = child._validationResult;
       }
     }
+    _accessiblityFocusBlockType = _accessiblityFocusBlockType._merge(
+      child._accessiblityFocusBlockType,
+    );
 
     if (_hitTestBehavior == ui.SemanticsHitTestBehavior.defer) {
       _hitTestBehavior = child._hitTestBehavior;
@@ -6608,6 +6671,7 @@ class SemanticsConfiguration {
       .._attributedValue = _attributedValue
       .._attributedDecreasedValue = _attributedDecreasedValue
       .._attributedHint = _attributedHint
+      .._accessiblityFocusBlockType = _accessiblityFocusBlockType
       .._hintOverrides = _hintOverrides
       .._tooltip = _tooltip
       .._flags = _flags
