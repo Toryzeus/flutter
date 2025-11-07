@@ -1,6 +1,6 @@
-/*I'm new to coding and now I want to get the sum of two arrays... Actually the sum of all their elements. I'll appreciate for your help.
+/*Soy nuevo en programación y ahora quiero obtener la suma de dos matrices... En realidad, la suma de todos sus elementos. Agradeceré tu ayuda.
 
-P.S. Each array includes only integer numbers. Output is a number too.
+P.D.: Cada matriz incluye solo números enteros. El resultado también es un número.
 */
 int arrayPlusArray(List<int> arr1, List<int> arr2) {
   int sum1 = arr1.fold(0,(valor, numero) => valor + numero);//suma los elementos del primer array
